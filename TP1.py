@@ -181,13 +181,13 @@ class PaintCG:
         self.transform_button_areas = []
         
         # Botões de desenho
-        y_start = 80
+        y_start = 280
         for i in range(6):  # Agora temos 6 modos (incluindo freehand)
             rect = pygame.Rect(15, y_start + i * 30, 290, 26)
             self.button_areas.append(rect)
         
         # Botões de transformação
-        y_start = 420
+        y_start = 490
         for i in range(6):
             rect = pygame.Rect(15, y_start + i * 28, 290, 25)
             self.transform_button_areas.append(rect)
@@ -208,25 +208,25 @@ class PaintCG:
                         (self.panel_width - 2, 0), (self.panel_width - 2, self.height), 2)
         
         # Título principal com estilo
-        title = self.font_title.render("🎨 Paint Pro CG", True, self.DARK_BLUE)
+        title = self.font_title.render("Paint PRO", True, self.DARK_BLUE)
         self.screen.blit(title, (20, 15))
         
         # Linha decorativa abaixo do título
         pygame.draw.line(self.screen, self.DARK_BLUE, (20, 45), (self.panel_width - 30, 45), 2)
         
         # Seção de ferramentas de desenho
-        y_offset = 60
-        section_title = self.font_button.render("🛠 Ferramentas:", True, self.DARK_GRAY)
+        y_offset = 270
+        section_title = self.font_button.render("Ferramentas:", True, self.DARK_GRAY)
         self.screen.blit(section_title, (20, y_offset - 5))
         
-        # Botões de desenho (corrigidos)
+        # Botões de desenho 
         buttons = [
-            ("🔍 Selecionar", DrawMode.SELECT, self.ACCENT),
-            ("• Ponto", DrawMode.POINT, self.BLUE),
-            ("━ Linha", DrawMode.LINE, self.GREEN),
-            ("○ Círculo", DrawMode.CIRCLE, self.RED),
-            ("▲ Polígono", DrawMode.POLYGON, self.PURPLE),
-            ("✏ Desenho Livre", DrawMode.FREEHAND, self.ORANGE)
+            ("Selecionar", DrawMode.SELECT, self.ACCENT),
+            ("Ponto", DrawMode.POINT, self.BLUE),
+            ("Linha", DrawMode.LINE, self.GREEN),
+            ("Círculo", DrawMode.CIRCLE, self.RED),
+            ("Polígono", DrawMode.POLYGON, self.PURPLE),
+            ("Desenho Livre", DrawMode.FREEHAND, self.ORANGE)
         ]
         
         for i, (text, mode, color) in enumerate(buttons):
@@ -254,23 +254,25 @@ class PaintCG:
             self.screen.blit(text_surf, text_rect)
         
         # Roda cromática
-        color_title = self.font_button.render("🎨 Cor:", True, self.DARK_GRAY)
-        self.screen.blit(color_title, (20, 240))
-        
+        y_offset = 60
+        color_title = self.font_button.render("Cor:", True, self.DARK_GRAY)
+        self.screen.blit(color_title, (15, y_offset))
+
         # Desenha roda cromática
+        self.color_wheel.center = (140, y_offset + 80)  # Mover para cima
         self.color_wheel.draw(self.screen)
-        
+
         # Mostra cor atual
-        color_preview = pygame.Rect(250, 280, 40, 40)
+        color_preview = pygame.Rect(250, y_offset + 60, 40, 40)
         pygame.draw.rect(self.screen, self.current_draw_color, color_preview, border_radius=8)
         pygame.draw.rect(self.screen, self.DARK_GRAY, color_preview, 3, border_radius=8)
         
         # Controle de espessura
-        thickness_title = self.font_button.render("🖌 Espessura:", True, self.DARK_GRAY)
-        self.screen.blit(thickness_title, (20, 350))
+        thickness_title = self.font_button.render("Espessura:", True, self.DARK_GRAY)
+        self.screen.blit(thickness_title, (20, 230))
         
         # Campo de input de espessura
-        thickness_input_rect = pygame.Rect(20, 375, 80, 25)
+        thickness_input_rect = pygame.Rect(150, 235, 80, 25)
         input_color = self.ACCENT if self.thickness_input_active else self.WHITE
         pygame.draw.rect(self.screen, input_color, thickness_input_rect, border_radius=5)
         pygame.draw.rect(self.screen, self.DARK_GRAY, thickness_input_rect, 2, border_radius=5)
@@ -288,8 +290,8 @@ class PaintCG:
                            (cursor_x, thickness_input_rect.y + 22), 2)
         
         # Botões +/- para espessura
-        thickness_inc_rect = pygame.Rect(110, 375, 20, 12)
-        thickness_dec_rect = pygame.Rect(110, 388, 20, 12)
+        thickness_inc_rect = pygame.Rect(125, 235, 20, 12)
+        thickness_dec_rect = pygame.Rect(125, 248, 20, 12)
         
         pygame.draw.rect(self.screen, self.GREEN, thickness_inc_rect, border_radius=3)
         pygame.draw.rect(self.screen, self.RED, thickness_dec_rect, border_radius=3)
@@ -301,24 +303,24 @@ class PaintCG:
         self.screen.blit(minus_text, (thickness_dec_rect.centerx - 4, thickness_dec_rect.centery - 6))
         
         # Preview da espessura
-        preview_center = (180, 387)
+        preview_center = (280, 250)
         pygame.draw.circle(self.screen, self.current_draw_color, preview_center, 
                          max(1, min(15, self.brush_thickness)))
         pygame.draw.circle(self.screen, self.DARK_GRAY, preview_center, 
                          max(3, min(17, self.brush_thickness + 2)), 2)
         
         # Seção de transformações
-        y_offset = 420
-        section_title = self.font_button.render("⚙ Transformações:", True, self.DARK_GRAY)
+        y_offset = 475
+        section_title = self.font_button.render("Transformações:", True, self.DARK_GRAY)
         self.screen.blit(section_title, (20, y_offset - 5))
         
         transforms = [
-            ("↔ Translação", TransformMode.TRANSLATE, self.BLUE),
-            ("↻ Rotação", TransformMode.ROTATE, self.GREEN),
-            ("⚡ Escala", TransformMode.SCALE, self.ORANGE),
-            ("⟷ Reflexão X", TransformMode.REFLECT_X, self.RED),
-            ("↕ Reflexão Y", TransformMode.REFLECT_Y, self.PURPLE),
-            ("↙ Reflexão XY", TransformMode.REFLECT_XY, self.ACCENT)
+            ("Translação", TransformMode.TRANSLATE, self.BLUE),
+            ("Rotação", TransformMode.ROTATE, self.GREEN),
+            ("Escala", TransformMode.SCALE, self.ORANGE),
+            ("Reflexão X", TransformMode.REFLECT_X, self.RED),
+            ("Reflexão Y", TransformMode.REFLECT_Y, self.PURPLE),
+            ("Reflexão XY", TransformMode.REFLECT_XY, self.ACCENT)
         ]
         
         for i, (text, mode, color) in enumerate(transforms):
@@ -337,7 +339,7 @@ class PaintCG:
             self.screen.blit(text_surf, text_rect)
         
         # Painel de controle de valores
-        y_offset = 600
+        y_offset = 670
         control_bg = pygame.Rect(15, y_offset, 290, 140)
         pygame.draw.rect(self.screen, self.WHITE, control_bg, border_radius=12)
         pygame.draw.rect(self.screen, self.DARK_BLUE, control_bg, 3, border_radius=12)
@@ -484,13 +486,13 @@ class PaintCG:
         self.screen.blit(help_text, (help_btn.centerx - 6, help_btn.centery - 8))
         
         # Instruções gerais na parte inferior
-        y_offset = self.height - 50
+        y_offset = 880
         general_info = [
-            "💡 Atalhos: C (limpar) • Esc (finalizar) • Ctrl+Z (zoom out) • Ctrl+= (zoom in)"
+            "Atalhos: C (limpar) • Esc (finalizar)"
         ]
         
         for i, text in enumerate(general_info):
-            text_surf = pygame.font.Font(None, 14).render(text, True, self.DARK_BLUE)
+            text_surf = pygame.font.Font(None, 15).render(text, True, self.DARK_BLUE)
             self.screen.blit(text_surf, (20, y_offset + i * 18))
     
     def handle_panel_click(self, pos):
@@ -530,15 +532,15 @@ class PaintCG:
             return True
         
         # Campo de input de espessura
-        thickness_input_rect = pygame.Rect(20, 375, 80, 25)
+        thickness_input_rect = pygame.Rect(150, 235, 80, 25)
         if thickness_input_rect.collidepoint(pos):
             self.thickness_input_active = True
             self.thickness_input_text = ""
             return True
         
         # Botões +/- de espessura
-        thickness_inc_rect = pygame.Rect(110, 375, 20, 12)
-        thickness_dec_rect = pygame.Rect(110, 388, 20, 12)
+        thickness_inc_rect = pygame.Rect(125, 235, 20, 12)
+        thickness_dec_rect = pygame.Rect(125, 248, 20, 12)
         
         if thickness_inc_rect.collidepoint(pos):
             self.brush_thickness = min(50, self.brush_thickness + 1)
@@ -1124,7 +1126,7 @@ class PaintCG:
                         # Desativa inputs se clicar fora
                         if self.rotation_input_active or self.thickness_input_active:
                             # Verifica se clicou nos campos de input
-                            thickness_input_rect = pygame.Rect(20, 375, 80, 25)
+                            thickness_input_rect = pygame.Rect(150, 235, 80, 25)
                             rotation_input_rect = pygame.Rect(25, 655, 200, 25)
                             
                             if not (thickness_input_rect.collidepoint(pos) or 
