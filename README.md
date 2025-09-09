@@ -1,2 +1,2 @@
-# Computa-o-Gr-fica
+# Computação Gráfica
 Matéria da faculdade PUC-MG com a professora Rosi
