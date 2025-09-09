@@ -136,7 +136,7 @@ class PaintCG:
         
         # Configurações da interface (painel mais largo)
         self.font_title = pygame.font.Font(None, 28)
-        self.font_button = pygame.font.Font(None, 22)
+        self.font_button = pygame.font.Font(None, 20)
         self.font_small = pygame.font.Font(None, 18)
         self.panel_width = 320          # Painel ainda mais largo
         self.draw_area = pygame.Rect(self.panel_width, 0, self.width - self.panel_width, self.height)
@@ -169,6 +169,7 @@ class PaintCG:
         # Configurações para fluidez
         self.clock = pygame.time.Clock()
         self.fps = 120                  # FPS alto para fluidez
+        self.fullscreen = False
         
         # Áreas de botões (corrigidas)
         self.button_areas = []
@@ -182,7 +183,7 @@ class PaintCG:
         # Botões de desenho
         y_start = 80
         for i in range(6):  # Agora temos 6 modos (incluindo freehand)
-            rect = pygame.Rect(15, y_start + i * 35, 290, 30)
+            rect = pygame.Rect(15, y_start + i * 30, 290, 26)
             self.button_areas.append(rect)
         
         # Botões de transformação
@@ -472,6 +473,16 @@ class PaintCG:
         zoom_surf = pygame.font.Font(None, 16).render(zoom_level_text, True, self.DARK_GRAY)
         self.screen.blit(zoom_surf, (230, y_offset + 182))
         
+        # Botões superiores
+        fullscreen_btn = pygame.Rect(self.width - 60, 10, 40, 25)
+        help_btn = pygame.Rect(self.width - 110, 10, 25, 25)
+        pygame.draw.rect(self.screen, self.BLUE, fullscreen_btn, border_radius=5)
+        pygame.draw.rect(self.screen, self.GREEN, help_btn, border_radius=12)
+        fs_text = self.font_small.render("⛶", True, self.WHITE)
+        help_text = self.font_button.render("?", True, self.WHITE)
+        self.screen.blit(fs_text, (fullscreen_btn.centerx - 6, fullscreen_btn.centery - 8))
+        self.screen.blit(help_text, (help_btn.centerx - 6, help_btn.centery - 8))
+        
         # Instruções gerais na parte inferior
         y_offset = self.height - 50
         general_info = [
@@ -486,6 +497,19 @@ class PaintCG:
         """Gerencia cliques no painel lateral (corrigido)"""
         x, y = pos
         if x > self.panel_width:
+            # Botões superiores
+            fullscreen_btn = pygame.Rect(self.width - 60, 10, 40, 25)
+            help_btn = pygame.Rect(self.width - 110, 10, 25, 25)
+            if fullscreen_btn.collidepoint(pos):
+                self.fullscreen = not self.fullscreen
+                if self.fullscreen:
+                    self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                else:
+                    self.screen = pygame.display.set_mode((self.width, self.height))
+                return True
+            if help_btn.collidepoint(pos):
+                print("AJUDA: Use setas para translação, clique em formas para selecionar, ESC finaliza polígono")
+                return True
             return False
             
         # Botões de desenho (usando áreas corrigidas)
@@ -883,13 +907,21 @@ class PaintCG:
         matrix = np.eye(3)
         
         if self.transform_mode == TransformMode.TRANSLATE:
-            matrix = self.get_translation_matrix(self.transform_factor * 20, self.transform_factor * 20)
-        elif self.transform_mode == TransformMode.ROTATE:
-            matrix = self.get_rotation_matrix(self.rotation_angle, cx, cy)
-        elif self.transform_mode == TransformMode.SCALE:
-            matrix = self.get_scale_matrix(self.transform_factor, self.transform_factor, cx, cy)
-        else:
-            matrix = self.get_reflection_matrix(self.transform_mode)
+            # Direções baseadas em botões ou posição do mouse
+            keys = pygame.key.get_pressed()
+            dx = dy = 0
+            if keys[pygame.K_UP]: dy = -self.transform_factor * 20
+            elif keys[pygame.K_DOWN]: dy = self.transform_factor * 20
+            if keys[pygame.K_LEFT]: dx = -self.transform_factor * 20
+            elif keys[pygame.K_RIGHT]: dx = self.transform_factor * 20
+            
+            # Se nenhuma tecla, usa posição do mouse
+            if dx == 0 and dy == 0:
+                mouse_pos = pygame.mouse.get_pos()
+                dx = (mouse_pos[0] - 650) * 0.1
+                dy = (mouse_pos[1] - 450) * 0.1
+            
+            matrix = self.get_translation_matrix(dx, dy)    
         
         # Aplica transformação
         for shape in selected_shapes:
