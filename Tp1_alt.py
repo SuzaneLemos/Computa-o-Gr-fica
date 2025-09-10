@@ -4,7 +4,7 @@ import math
 from enum import Enum
 import colorsys
 
-# --- ENUMS para Modos e Algoritmos ---
+# ---- ENUMS para Modos e Algoritmos ----
 # Enums são usados para criar conjuntos de constantes nomeadas, tornando o código mais legível.
 class DrawMode(Enum):
     """Define os diferentes modos de desenho/ferramentas disponíveis."""
