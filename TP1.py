@@ -169,6 +169,7 @@ class PaintCG:
         # Configurações para fluidez
         self.clock = pygame.time.Clock()
         self.fps = 120                  # FPS alto para fluidez
+        self.original_size = (self.width, self.height)
         self.fullscreen = False
         
         # Áreas de botões (corrigidas)
@@ -605,6 +606,30 @@ class PaintCG:
             self.zoom_in()
             return True
         
+        # Botões de controle (y_offset deve ser 670 conforme seu código)
+        if self.transform_mode == TransformMode.ROTATE:
+            # Botões rotação
+            inc_rect = pygame.Rect(235, 670 + 55, 20, 12)
+            dec_rect = pygame.Rect(235, 670 + 68, 20, 12)
+            
+            if inc_rect.collidepoint(pos):
+                self.rotation_angle = (self.rotation_angle + 5) % 360
+                return True
+            elif dec_rect.collidepoint(pos):
+                self.rotation_angle = (self.rotation_angle - 5) % 360
+                return True
+        else:
+            # Botões de fator
+            dec_button = pygame.Rect(235, 670 + 55, 25, 12)
+            inc_button = pygame.Rect(265, 670 + 55, 25, 12)
+            
+            if dec_button.collidepoint(pos):
+                self.transform_factor = max(0.1, self.transform_factor - 0.1)
+                return True
+            elif inc_button.collidepoint(pos):
+                self.transform_factor = min(3.0, self.transform_factor + 0.1)
+                return True
+        
         return False
     
     def zoom_in(self):
@@ -619,6 +644,20 @@ class PaintCG:
         """Reseta o zoom para 1:1"""
         self.zoom_factor = 1.0
         self.zoom_offset = [0, 0]
+        
+    def toggle_fullscreen(self):
+        """Alterna entre tela cheia e janela"""
+        self.fullscreen = not self.fullscreen
+        if self.fullscreen:
+            self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+            info = pygame.display.Info()
+            self.width, self.height = info.current_w, info.current_h
+        else:
+            self.width, self.height = self.original_size
+            self.screen = pygame.display.set_mode((self.width, self.height))
+    
+        # Atualiza área de desenho
+        self.draw_area = pygame.Rect(self.panel_width, 0, self.width - self.panel_width, self.height)
     
     def screen_to_world(self, pos):
         """Converte coordenadas da tela para coordenadas do mundo (considerando zoom)"""
@@ -887,6 +926,55 @@ class PaintCG:
                 [0, -1, self.draw_area.height],
                 [0, 0, 1]
             ])
+            
+    def cohen_sutherland_clip(self, x1, y1, x2, y2):
+        """Algoritmo Cohen-Sutherland para recorte de linhas"""
+        # Códigos de região
+        INSIDE, LEFT, RIGHT, BOTTOM, TOP = 0, 1, 2, 4, 8
+        
+        def compute_code(x, y):
+            code = INSIDE
+            if x < self.draw_area.left: code |= LEFT
+            elif x > self.draw_area.right: code |= RIGHT
+            if y < self.draw_area.top: code |= BOTTOM
+            elif y > self.draw_area.bottom: code |= TOP
+            return code
+        
+        code1 = compute_code(x1, y1)
+        code2 = compute_code(x2, y2)
+        accept = False
+        
+        while True:
+            if code1 == 0 and code2 == 0:  # Ambos dentro
+                accept = True
+                break
+            elif code1 & code2:  # Ambos do mesmo lado externo
+                break
+            else:
+                # Ponto fora da janela
+                code_out = code1 if code1 != 0 else code2
+                
+                if code_out & TOP:
+                    x = x1 + (x2 - x1) * (self.draw_area.bottom - y1) / (y2 - y1)
+                    y = self.draw_area.bottom
+                elif code_out & BOTTOM:
+                    x = x1 + (x2 - x1) * (self.draw_area.top - y1) / (y2 - y1)
+                    y = self.draw_area.top
+                elif code_out & RIGHT:
+                    y = y1 + (y2 - y1) * (self.draw_area.right - x1) / (x2 - x1)
+                    x = self.draw_area.right
+                elif code_out & LEFT:
+                    y = y1 + (y2 - y1) * (self.draw_area.left - x1) / (x2 - x1)
+                    x = self.draw_area.left
+                
+                if code_out == code1:
+                    x1, y1 = x, y
+                    code1 = compute_code(x1, y1)
+                else:
+                    x2, y2 = x, y
+                    code2 = compute_code(x2, y2)
+        
+        return (int(x1), int(y1), int(x2), int(y2)) if accept else None
     
     def apply_transformations(self):
         """Aplica transformações às formas selecionadas"""
@@ -909,7 +997,7 @@ class PaintCG:
         matrix = np.eye(3)
         
         if self.transform_mode == TransformMode.TRANSLATE:
-            # Direções baseadas em botões ou posição do mouse
+            # Translação em todas as direções
             keys = pygame.key.get_pressed()
             dx = dy = 0
             if keys[pygame.K_UP]: dy = -self.transform_factor * 20
@@ -917,72 +1005,96 @@ class PaintCG:
             if keys[pygame.K_LEFT]: dx = -self.transform_factor * 20
             elif keys[pygame.K_RIGHT]: dx = self.transform_factor * 20
             
-            # Se nenhuma tecla, usa posição do mouse
             if dx == 0 and dy == 0:
-                mouse_pos = pygame.mouse.get_pos()
-                dx = (mouse_pos[0] - 650) * 0.1
-                dy = (mouse_pos[1] - 450) * 0.1
+                dx = self.transform_factor * 20
+                dy = self.transform_factor * 20
             
-            matrix = self.get_translation_matrix(dx, dy)    
+            matrix = self.get_translation_matrix(dx, dy)
+            
+        elif self.transform_mode == TransformMode.ROTATE:
+            matrix = self.get_rotation_matrix(self.rotation_angle, cx, cy)
+            
+        elif self.transform_mode == TransformMode.SCALE:
+            matrix = self.get_scale_matrix(self.transform_factor, self.transform_factor, cx, cy)
+            
+        else:  # Reflexões
+            matrix = self.get_reflection_matrix(self.transform_mode)
         
         # Aplica transformação
         for shape in selected_shapes:
             shape.points = self.apply_transformation_matrix(shape.points, matrix)
     
     def draw_shapes(self):
-        """Desenha todas as formas na tela (com zoom)"""
+        """Desenha todas as formas na tela usando algoritmos de rasterização"""
         for shape in self.shapes:
             color = self.RED if shape.selected else shape.color
             thickness = max(1, int(shape.thickness * self.zoom_factor))
             
             if shape.type == 'point':
-                # Converte coordenada para tela
                 screen_pos = self.world_to_screen(shape.points[0])
                 if self.draw_area.collidepoint(screen_pos):
                     point_size = max(2, int(5 * self.zoom_factor))
-                    pygame.draw.circle(self.screen, color, screen_pos, point_size)
-                    if shape.selected:
-                        pygame.draw.circle(self.screen, self.WHITE, screen_pos, point_size + 2, 2)
+                    # Usar algoritmo de círculo para o ponto
+                    circle_points = self.draw_circle_bresenham(screen_pos[0], screen_pos[1], point_size, color)
+                    for px, py in circle_points:
+                        if 0 <= px < self.width and 0 <= py < self.height:
+                            self.screen.set_at((px, py), color)
             
             elif shape.type == 'line':
                 if len(shape.points) >= 2:
                     start_pos = self.world_to_screen(shape.points[0])
                     end_pos = self.world_to_screen(shape.points[1])
                     
-                    # Verifica se a linha está visível
-                    if (self.draw_area.collidepoint(start_pos) or 
-                        self.draw_area.collidepoint(end_pos)):
-                        pygame.draw.line(self.screen, color, start_pos, end_pos, thickness)
-                        
-                        if shape.selected:
-                            pygame.draw.line(self.screen, self.WHITE, start_pos, end_pos, thickness + 4)
-                            pygame.draw.line(self.screen, color, start_pos, end_pos, thickness + 2)
+                    # Aplicar recorte Cohen-Sutherland
+                    clipped_line = self.cohen_sutherland_clip(start_pos[0], start_pos[1], end_pos[0], end_pos[1])
+                    if clipped_line:
+                        x1, y1, x2, y2 = clipped_line
+                        # Usar Bresenham para linha
+                        line_points = self.draw_line_bresenham(x1, y1, x2, y2, color)
+                        for px, py in line_points:
+                            if 0 <= px < self.width and 0 <= py < self.height:
+                                for dy in range(-thickness//2, thickness//2 + 1):
+                                    for dx in range(-thickness//2, thickness//2 + 1):
+                                        if 0 <= px+dx < self.width and 0 <= py+dy < self.height:
+                                            self.screen.set_at((px+dx, py+dy), color)
             
             elif shape.type == 'circle':
                 if len(shape.points) >= 2:
                     center_pos = self.world_to_screen(shape.points[0])
-                    # Calcula raio considerando zoom
                     world_radius = math.sqrt((shape.points[1][0] - shape.points[0][0])**2 + 
-                                           (shape.points[1][1] - shape.points[0][1])**2)
+                                        (shape.points[1][1] - shape.points[0][1])**2)
                     screen_radius = int(world_radius * self.zoom_factor)
                     
                     if screen_radius > 0:
-                        pygame.draw.circle(self.screen, color, center_pos, screen_radius, thickness)
-                        if shape.selected:
-                            pygame.draw.circle(self.screen, self.WHITE, center_pos, screen_radius + 2, 2)
-                            pygame.draw.circle(self.screen, color, center_pos, 4)
+                        # Usar Bresenham para círculo
+                        circle_points = self.draw_circle_bresenham(center_pos[0], center_pos[1], screen_radius, color)
+                        for px, py in circle_points:
+                            if self.draw_area.collidepoint((px, py)):
+                                for i in range(thickness):
+                                    # Desenha círculos concêntricos para espessura
+                                    thick_points = self.draw_circle_bresenham(center_pos[0], center_pos[1], screen_radius + i - thickness//2, color)
+                                    for tpx, tpy in thick_points:
+                                        if 0 <= tpx < self.width and 0 <= tpy < self.height:
+                                            self.screen.set_at((tpx, tpy), color)
             
             elif shape.type == 'polygon':
                 if len(shape.points) > 2:
                     screen_points = [self.world_to_screen(p) for p in shape.points]
-                    # Verifica se algum ponto está visível
-                    if any(self.draw_area.collidepoint(p) for p in screen_points):
-                        pygame.draw.polygon(self.screen, color, screen_points, thickness)
+                    # Desenha arestas do polígono usando Bresenham
+                    for i in range(len(screen_points)):
+                        start = screen_points[i]
+                        end = screen_points[(i + 1) % len(screen_points)]
                         
-                        if shape.selected:
-                            for i, point in enumerate(screen_points):
-                                pygame.draw.circle(self.screen, self.WHITE, point, 6)
-                                pygame.draw.circle(self.screen, color, point, 4)
+                        clipped_line = self.cohen_sutherland_clip(start[0], start[1], end[0], end[1])
+                        if clipped_line:
+                            x1, y1, x2, y2 = clipped_line
+                            line_points = self.draw_line_bresenham(x1, y1, x2, y2, color)
+                            for px, py in line_points:
+                                if 0 <= px < self.width and 0 <= py < self.height:
+                                    for dy in range(-thickness//2, thickness//2 + 1):
+                                        for dx in range(-thickness//2, thickness//2 + 1):
+                                            if 0 <= px+dx < self.width and 0 <= py+dy < self.height:
+                                                self.screen.set_at((px+dx, py+dy), color)
             
             elif shape.type == 'freehand':
                 if len(shape.points) > 1:
